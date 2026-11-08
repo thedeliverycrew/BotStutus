@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kick OBS Chat Widget</title>
+    <style>
+        /* Base Reset */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        /* Transparent Body for OBS */
+        body {
+            background-color: transparent;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end; /* New messages appear at the bottom */
+            height: 100vh;
+            padding: 20px;
+        }
+
+        /* Container for messages */
+        #chat-container {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            width: 100%;
+            max-width: 450px;
+        }
+
+        /* Message Style (Glassmorphism) */
+        .chat-message {
+            background-color: rgba(15, 15, 20, 0.5);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 12px 16px;
+            color: #ffffff;
+            font-size: 16px;
+            line-height: 1.4;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8), 0px 0px 4px rgba(0, 0, 0, 0.6);
+            word-wrap: break-word;
+
+            /* Animation properties */
+            opacity: 0;
+            transform: translateX(-20px);
+            animation: slideIn 0.4s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+            transition: opacity 0.5s ease, transform 0.5s ease;
+        }
+
+        /* Fade out transition class */
+        .chat-message.fade-out {
+            opacity: 0;
+            transform: translateY(-10px);
+        }
+
+        /* Username Style */
+        .username {
+            font-weight: bold;
+            color: #53f649; /* Kick Green */
+            margin-right: 6px;
+        }
+
+        /* Content Style */
+        .content {
+            color: #ffffff;
+        }
+
+        /* Slide In Animation */
+        @keyframes slideIn {
+            0% {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            100% {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+    </style>
+    <!-- Include Pusher -->
+    <script src="https://js.pusher.com/7.2/pusher.min.js"></script>
+</head>
+<body>
+
+    <div id="chat-container"></div>
+
+    <script>
+        // 1. Hardcoded Chatroom ID (Replace this manually)
+        const chatroomId = "YOUR_CHATROOM_ID_HERE";
+
+        // 2. Setup Pusher
+        const pusher = new Pusher('32cbd69e4b950bf97679', {
+            cluster: 'us2',
+            forceTLS: true
+        });
+
+        // 3. Subscribe to the channel
+        const channel = pusher.subscribe(`chatrooms.${chatroomId}.v2`);
+
+        // 4. Bind to the chat message event
+        channel.bind('App\\Events\\ChatMessageEvent', function(messageData) {
+            if (messageData && messageData.sender && messageData.content) {
+                const username = messageData.sender.username;
+                const content = messageData.content;
+                displayMessage(username, content);
+            }
+        });
+
+        // 5. Function to display messages
+        function displayMessage(username, content) {
+            const container = document.getElementById('chat-container');
+
+            // Create message element
+            const msgEl = document.createElement('div');
+            msgEl.className = 'chat-message';
+
+            // Create username element
+            const userEl = document.createElement('span');
+            userEl.className = 'username';
+            userEl.textContent = username + ':';
+
+            // Create content element
+            const contentEl = document.createElement('span');
+            contentEl.className = 'content';
+            contentEl.innerHTML = formatContent(content);
+
+            // Append elements
+            msgEl.appendChild(userEl);
+            msgEl.appendChild(contentEl);
+            container.appendChild(msgEl);
+
+            // Keep only a reasonable amount of DOM elements to prevent memory leaks (e.g., max 100)
+            if (container.children.length > 100) {
+                container.removeChild(container.firstChild);
+            }
+
+            // 6. Auto-remove message after 30 seconds smoothly
+            setTimeout(() => {
+                msgEl.classList.add('fade-out');
+
+                // Wait for the transition to finish before removing from DOM
+                setTimeout(() => {
+                    if (msgEl.parentNode) {
+                        msgEl.parentNode.removeChild(msgEl);
+                    }
+                }, 500); // 500ms matches the transition duration in CSS
+            }, 30000); // 30 seconds
+        }
+
+        // Helper to escape HTML to prevent XSS
+        function formatContent(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>
